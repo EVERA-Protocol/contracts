@@ -19,9 +19,10 @@ contract CreateSampleRWAToken is Script {
         string memory institutionAddress = "123 Main St, New York, NY";
         string memory documentURI = "ipfs://QmSampleDocument";
         string memory imageURI = "ipfs://QmSampleImage";
-        uint256 totalRWASupply = 1000 * 10**18;
-        uint256 pricePerRWA = 100 * 10**18;
-        string memory description = "Sample tokenized real estate property in downtown area";
+        uint256 totalRWASupply = 1000 * 10 ** 18;
+        uint256 pricePerRWA = 100 * 10 ** 18;
+        string
+            memory description = "Sample tokenized real estate property in downtown area";
 
         vm.startBroadcast(deployerPrivateKey);
 

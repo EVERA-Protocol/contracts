@@ -13,7 +13,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @dev Implements IRWALaunchpad interface
  */
 contract RWALaunchpad is Ownable(msg.sender), ReentrancyGuard, IRWALaunchpad {
-
     address[] private _allRWATokens;
 
     // Mapping from creator address to their created tokens
@@ -44,10 +43,16 @@ contract RWALaunchpad is Ownable(msg.sender), ReentrancyGuard, IRWALaunchpad {
         string memory description
     ) external nonReentrant returns (address tokenAddress) {
         // Validate inputs
-        if (bytes(name).length == 0 || bytes(name).length > RWAConstants.MAX_NAME_LENGTH) {
+        if (
+            bytes(name).length == 0 ||
+            bytes(name).length > RWAConstants.MAX_NAME_LENGTH
+        ) {
             revert RWAConstants.EmptyString();
         }
-        if (bytes(symbol).length == 0 || bytes(symbol).length > RWAConstants.MAX_SYMBOL_LENGTH) {
+        if (
+            bytes(symbol).length == 0 ||
+            bytes(symbol).length > RWAConstants.MAX_SYMBOL_LENGTH
+        ) {
             revert RWAConstants.EmptyString();
         }
         if (bytes(institutionName).length == 0) {
@@ -100,7 +105,9 @@ contract RWALaunchpad is Ownable(msg.sender), ReentrancyGuard, IRWALaunchpad {
      * @param creator Address of the creator
      * @return Array of token addresses created by the creator
      */
-    function getTokensByCreator(address creator) external view returns (address[] memory) {
+    function getTokensByCreator(
+        address creator
+    ) external view returns (address[] memory) {
         return _creatorToTokens[creator];
     }
 
@@ -138,7 +145,10 @@ contract RWALaunchpad is Ownable(msg.sender), ReentrancyGuard, IRWALaunchpad {
      * @param index Index of the token in the creator's array
      * @return Token address
      */
-    function getCreatorTokenAtIndex(address creator, uint256 index) external view returns (address) {
+    function getCreatorTokenAtIndex(
+        address creator,
+        uint256 index
+    ) external view returns (address) {
         if (index >= _creatorToTokens[creator].length) {
             revert RWAConstants.InvalidAmount();
         }
