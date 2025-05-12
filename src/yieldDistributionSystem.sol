@@ -345,6 +345,27 @@ contract YieldDistributionSystem is ReentrancyGuard, Ownable {
         return snapshotHolders.length;
     }
 
+    /**
+     * @dev Gets the count of holders in the snapshot
+     */
+    function getSnapshotHolders() external view returns (address[] memory) {
+        return snapshotHolders;
+    }
+
+    /**
+     * @dev Checks if an address is in the snapshot
+     * @param _address The address to check
+     * @return True if the address is in the snapshot, false otherwise
+     */
+    function isInSnapshot(address _address) external view returns (bool) {
+        for (uint256 i = 0; i < snapshotHolders.length; i++) {
+            if (snapshotHolders[i] == _address) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ========== ADMIN FUNCTIONS ==========
 
     /**

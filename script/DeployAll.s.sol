@@ -13,7 +13,7 @@ import {RWAToken} from "../src/RWAToken.sol";
  */
 contract DeployAll is Script {
     // File to store deployed addresses
-    string constant ADDRESSES_FILE = "deployed_addresses.json";
+    // string constant ADDRESSES_FILE = "deployed_addresses.json";
 
     // Sample token parameters
     string constant NAME = "Sample Real Estate Token";
@@ -22,8 +22,8 @@ contract DeployAll is Script {
     string constant INSTITUTION_ADDRESS = "123 Main St, New York, NY";
     string constant DOCUMENT_URI = "ipfs://QmSampleDocument";
     string constant IMAGE_URI = "ipfs://QmSampleImage";
-    uint256 constant TOTAL_SUPPLY = 1000 * 10**18;
-    uint256 constant PRICE_PER_RWA = 100 * 10**18;
+    uint256 constant TOTAL_SUPPLY = 1000 * 10 ** 18;
+    uint256 constant PRICE_PER_RWA = 100 * 10 ** 18;
     string constant DESCRIPTION = "Sample tokenized real estate property in downtown area";
 
     function setUp() public {
@@ -72,18 +72,26 @@ contract DeployAll is Script {
 
     function saveAddresses(address launchpadAddress, address tokenAddress) internal {
         // Create JSON string with deployed addresses
-        string memory json = string(abi.encodePacked(
-            '{\n',
-            '  "launchpad": "', vm.toString(launchpadAddress), '",\n',
-            '  "sampleToken": "', vm.toString(tokenAddress), '",\n',
-            // '  "network": "', getNetworkName(), '",\n',
-            '  "deployedAt": "', vm.toString(block.timestamp), '"\n',
-            '}'
-        ));
+        string memory json = string(
+            abi.encodePacked(
+                "{\n",
+                '  "launchpad": "',
+                vm.toString(launchpadAddress),
+                '",\n',
+                '  "sampleToken": "',
+                vm.toString(tokenAddress),
+                '",\n',
+                // '  "network": "', getNetworkName(), '",\n',
+                '  "deployedAt": "',
+                vm.toString(block.timestamp),
+                '"\n',
+                "}"
+            )
+        );
 
         // Save to file
-        vm.writeFile(ADDRESSES_FILE, json);
-        console.log("Deployed addresses saved to", ADDRESSES_FILE);
+        // vm.writeFile(ADDRESSES_FILE, json);
+        // console.log("Deployed addresses saved to", ADDRESSES_FILE);
     }
 
     // function getNetworkName() internal view returns (string memory) {

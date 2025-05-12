@@ -45,6 +45,9 @@ while [[ $# -gt 0 ]]; do
         mumbai)
           RPC_URL="https://polygon-mumbai.infura.io/v3/${INFURA_API_KEY}"
           ;;
+        base-sepolia)
+           RPC_URL="https://base-sepolia.drpc.org"
+          ;;
         *)
           echo "Unknown network: $2"
           exit 1
@@ -83,7 +86,7 @@ if [[ -n "$PRIVATE_KEY" ]]; then
 fi
 
 # Build the command
-CMD="forge script script/DeployAll.s.sol --rpc-url $RPC_URL"
+CMD="forge script script/DeployAll.s.sol --rpc-url $RPC_URL --ffi"
 
 # Add --broadcast flag if requested
 if $BROADCAST; then
@@ -103,15 +106,15 @@ echo -e "${GREEN}Running deployment script...${NC}"
 eval $CMD
 
 # Check if deployment was successful
-if [ $? -eq 0 ]; then
-  echo -e "${GREEN}Deployment completed successfully!${NC}"
+# if [ $? -eq 0 ]; then
+#   echo -e "${GREEN}Deployment completed successfully!${NC}"
   
-  # Check if addresses file exists
-  if [ -f "deployed_addresses.json" ]; then
-    echo -e "${GREEN}Deployed addresses:${NC}"
-    cat deployed_addresses.json
-  fi
-else
-  echo -e "${YELLOW}Deployment failed.${NC}"
-  exit 1
-fi
+#   # Check if addresses file exists
+#   if [ -f "deployed_addresses.json" ]; then
+#     echo -e "${GREEN}Deployed addresses:${NC}"
+#     cat deployed_addresses.json
+#   fi
+# else
+#   echo -e "${YELLOW}Deployment failed.${NC}"
+#   exit 1
+# fi
