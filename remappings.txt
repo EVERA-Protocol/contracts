@@ -1,2 +1,5 @@
 @openzeppelin/=lib/openzeppelin-contracts/
 forge-std/=lib/forge-std/src/
+@eigenlayer/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/
+@eigenlayer-scripts/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/script/
+@eigenlayer-middleware/=lib/eigenlayer-middleware/
