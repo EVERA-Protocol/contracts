@@ -7,9 +7,12 @@ import {IServiceManager} from "@eigenlayer-middleware/src/interfaces/IServiceMan
 import {ECDSAUpgradeable} from "@openzeppelin-upgrades/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 import {IERC1271Upgradeable} from "@openzeppelin-upgrades/contracts/interfaces/IERC1271Upgradeable.sol";
 import {IRegistryCoordinator} from "@eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IStrategy} from "@eigenlayer/contracts/interfaces/IStrategy.sol";
 
+import {InstantSlasher} from "@eigenlayer-middleware/src/slashers/InstantSlasher.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@eigenlayer/contracts/interfaces/IRewardsCoordinator.sol";
+import {IAllocationManagerTypes} from "@eigenlayer/contracts/interfaces/IAllocationManager.sol";
 import {IAllocationManager} from "@eigenlayer/contracts/interfaces/IAllocationManager.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -17,6 +20,8 @@ abstract contract AVS is ECDSAServiceManagerBase, IAVS {
     using ECDSAUpgradeable for bytes32;
 
     uint32 public latestTaskNum;
+    address public admin;
+    address public instantSlasher;
 
     // Mappings for task management
     mapping(uint32 => bytes32) public allTaskHashes;
@@ -31,13 +36,18 @@ abstract contract AVS is ECDSAServiceManagerBase, IAVS {
 
     IRegistryCoordinator public immutable registryCoordinator;
 
+    // Modifiers
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can call this function");
+        _;
+    }
+
     constructor(
         address _avsDirectory,
         address _stakeRegistry,
         address _rewardsCoordinator,
         address _delegationManager,
         address _allocationManager,
-        uint32 _maxResponseIntervalBlocks,
         address _registryCoordinator
     )
         ECDSAServiceManagerBase(
@@ -49,13 +59,27 @@ abstract contract AVS is ECDSAServiceManagerBase, IAVS {
         )
     {
         registryCoordinator = IRegistryCoordinator(_registryCoordinator);
+        admin = msg.sender;
     }
 
     function initialize(
         address initialOwner,
-        address _rewardsInitiator
+        address _rewardsInitiator,
+        address _slasher
     ) external initializer {
         __ServiceManagerBase_init(initialOwner, _rewardsInitiator);
+        instantSlasher = _slasher;
+    }
+
+    // Admin management functions
+    function changeAdmin(address newAdmin) external onlyAdmin {
+        require(newAdmin != address(0), "New admin cannot be zero address");
+        admin = newAdmin;
+    }
+
+    function changeSlasher(address newSlasher) external onlyAdmin {
+        require(newSlasher != address(0), "New slasher cannot be zero address");
+        instantSlasher = newSlasher;
     }
 
     function createTask(
@@ -67,7 +91,8 @@ abstract contract AVS is ECDSAServiceManagerBase, IAVS {
         require(deadline > block.timestamp, "Deadline must be in future");
         require(isOperator(assignee), "Assignee must be registered operator");
 
-        uint32 taskId = ++latestTaskNum;
+        latestTaskNum++;
+        uint32 taskId = latestTaskNum;
 
         bytes memory taskData = abi.encodePacked(
             assignee,
@@ -147,24 +172,53 @@ abstract contract AVS is ECDSAServiceManagerBase, IAVS {
 
     function raiseSlashing(
         uint256 taskId,
-        string calldata reasonMetadata,
-        bytes calldata evidence
-    ) external override returns (bool) {
+        string calldata reasonMetadata
+    ) external onlyAdmin returns (bool) {
         require(taskId <= latestTaskNum, "Invalid task ID");
         Task storage task = tasks[uint32(taskId)];
 
         // Basic validation that the task exists and is completed
         require(task.operator != address(0), "Task does not exist");
 
+        // Check if there's already a slashing for this task
+        require(
+            !taskSlashings[uint32(taskId)].processed,
+            "Slashing already processed"
+        );
+
         SlashingInfo memory slashing = SlashingInfo({
             reporter: msg.sender,
             reportedAt: block.timestamp,
             reasonMetadata: reasonMetadata,
-            processed: false,
-            slashedAmount: 0 // Will be set when processed
+            processed: true, // Mark as processed since admin is doing it
+            slashedAmount: 0 // Will be set when processed by slasher
         });
 
         taskSlashings[uint32(taskId)] = slashing;
+
+        // Call the instant slasher if set
+        if (instantSlasher != address(0)) {
+            // Create empty arrays for strategies and wads
+            IStrategy[] memory strategies = new IStrategy[](0);
+            uint256[] memory wadsToSlash = new uint256[](0);
+
+            try
+                InstantSlasher(instantSlasher).fulfillSlashingRequest(
+                    IAllocationManagerTypes.SlashingParams({
+                        operator: task.operator,
+                        operatorSetId: uint8(taskId),
+                        strategies: strategies,
+                        wadsToSlash: wadsToSlash,
+                        description: reasonMetadata
+                    })
+                )
+            {
+                taskSlashings[uint32(taskId)].slashedAmount = 1; // Set actual amount if needed
+            } catch {
+                // If slashing fails, mark as unprocessed
+                taskSlashings[uint32(taskId)].processed = false;
+            }
+        }
 
         emit SlashingRaised(taskId, msg.sender, task.operator, reasonMetadata);
 
