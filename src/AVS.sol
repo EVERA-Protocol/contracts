@@ -7,7 +7,6 @@ import {ECDSAStakeRegistry} from "@eigenlayer-middleware/src/unaudited/ECDSAStak
 import {IServiceManager} from "@eigenlayer-middleware/src/interfaces/IServiceManager.sol";
 import {ECDSAUpgradeable} from "@openzeppelin-upgrades/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 import {IERC1271Upgradeable} from "@openzeppelin-upgrades/contracts/interfaces/IERC1271Upgradeable.sol";
-import {IRegistryCoordinator} from "@eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IStrategy} from "@eigenlayer/contracts/interfaces/IStrategy.sol";
 
 import {InstantSlasher} from "@eigenlayer-middleware/src/slashers/InstantSlasher.sol";
@@ -32,10 +31,7 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
     mapping(address => uint32[]) public operatorTasks;
 
     // Constants
-    uint256 private constant RESPONSE_WINDOW = 24 hours;
     bytes4 private constant ERC1271_MAGIC_VALUE = 0x1626ba7e;
-
-    IRegistryCoordinator public immutable registryCoordinator;
 
     // Modifiers
     modifier onlyAdmin() {
@@ -48,16 +44,24 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
         address _stakeRegistry,
         address _rewardsCoordinator,
         address _delegationManager,
-        address _allocationManager,
-        address _registryCoordinator
+        address _allocationManager
     )
-        ECDSAServiceManagerBase(_avsDirectory, _stakeRegistry, _rewardsCoordinator, _delegationManager, _allocationManager)
+        ECDSAServiceManagerBase(
+            _avsDirectory,
+            _stakeRegistry,
+            _rewardsCoordinator,
+            _delegationManager,
+            _allocationManager
+        )
     {
-        registryCoordinator = IRegistryCoordinator(_registryCoordinator);
         admin = msg.sender;
     }
 
-    function initialize(address initialOwner, address _rewardsInitiator, address _slasher) external initializer {
+    function initialize(
+        address initialOwner,
+        address _rewardsInitiator,
+        address _slasher
+    ) external initializer {
         __ServiceManagerBase_init(initialOwner, _rewardsInitiator);
         instantSlasher = _slasher;
     }
@@ -73,17 +77,24 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
         instantSlasher = newSlasher;
     }
 
-    function createTask(address assignee, uint256 deadline, address rwaToken, string calldata assetType)
-        external
-        override
-    {
+    function createTask(
+        address assignee,
+        uint256 deadline,
+        address rwaToken,
+        string calldata assetType
+    ) external override {
         require(deadline > block.timestamp, "Deadline must be in future");
         require(isOperator(assignee), "Assignee must be registered operator");
 
         latestTaskNum++;
         uint32 taskId = latestTaskNum;
 
-        bytes memory taskData = abi.encodePacked(assignee, deadline, rwaToken, assetType);
+        bytes memory taskData = abi.encodePacked(
+            assignee,
+            deadline,
+            rwaToken,
+            assetType
+        );
         bytes32 taskHash = keccak256(taskData);
 
         Task memory newTask = Task({
@@ -110,15 +121,23 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
         bytes calldata signature
     ) external override {
         require(taskId <= latestTaskNum, "Invalid task ID");
-        require(allTaskHashes[uint32(taskId)] == taskHash, "Task hash mismatch");
+        require(
+            allTaskHashes[uint32(taskId)] == taskHash,
+            "Task hash mismatch"
+        );
 
         Task storage task = tasks[uint32(taskId)];
         require(msg.sender == task.operator, "Not assigned operator");
         require(block.timestamp <= task.deadline, "Task deadline passed");
 
         // Verify signature
-        bytes32 messageHash = keccak256(abi.encodePacked(taskId, taskHash, metadataURI, status));
-        require(isValidSignature(messageHash, signature, msg.sender), "Invalid signature");
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(taskId, taskHash, metadataURI, status)
+        );
+        require(
+            isValidSignature(messageHash, signature, msg.sender),
+            "Invalid signature"
+        );
 
         TaskResponse memory response = TaskResponse({
             metadataURI: metadataURI,
@@ -132,21 +151,25 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
         emit TaskCompleted(taskId, taskHash, msg.sender, status);
     }
 
-    function getTask(uint256 taskId) external view override returns (Task memory) {
+    function getTask(
+        uint256 taskId
+    ) external view override returns (Task memory) {
         require(taskId <= latestTaskNum, "Invalid task ID");
         return tasks[uint32(taskId)];
     }
 
-    function getTaskResponse(uint256 taskId) external view override returns (TaskResponse memory) {
+    function getTaskResponse(
+        uint256 taskId
+    ) external view override returns (TaskResponse memory) {
         require(taskId <= latestTaskNum, "Invalid task ID");
         return taskResponses[uint32(taskId)];
     }
 
-    function raiseSlashing(uint256 taskId, string calldata reasonMetadata, bytes calldata evidence)
-        external
-        onlyAdmin
-        returns (bool)
-    {
+    function raiseSlashing(
+        uint256 taskId,
+        string calldata reasonMetadata,
+        bytes calldata evidence
+    ) external onlyAdmin returns (bool) {
         require(taskId <= latestTaskNum, "Invalid task ID");
         Task storage task = tasks[uint32(taskId)];
 
@@ -154,7 +177,10 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
         require(task.operator != address(0), "Task does not exist");
 
         // Check if there's already a slashing for this task
-        require(!taskSlashings[uint32(taskId)].processed, "Slashing already processed");
+        require(
+            !taskSlashings[uint32(taskId)].processed,
+            "Slashing already processed"
+        );
 
         SlashingInfo memory slashing = SlashingInfo({
             reporter: msg.sender,
@@ -172,15 +198,17 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
             IStrategy[] memory strategies = new IStrategy[](0);
             uint256[] memory wadsToSlash = new uint256[](0);
 
-            try InstantSlasher(instantSlasher).fulfillSlashingRequest(
-                IAllocationManagerTypes.SlashingParams({
-                    operator: task.operator,
-                    operatorSetId: uint8(taskId),
-                    strategies: strategies,
-                    wadsToSlash: wadsToSlash,
-                    description: reasonMetadata
-                })
-            ) {
+            try
+                InstantSlasher(instantSlasher).fulfillSlashingRequest(
+                    IAllocationManagerTypes.SlashingParams({
+                        operator: task.operator,
+                        operatorSetId: uint8(taskId),
+                        strategies: strategies,
+                        wadsToSlash: wadsToSlash,
+                        description: reasonMetadata
+                    })
+                )
+            {
                 taskSlashings[uint32(taskId)].slashedAmount = 1; // Set actual amount if needed
             } catch {
                 // If slashing fails, mark as unprocessed
@@ -193,17 +221,19 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
         return true;
     }
 
-    function getSlashingInfo(uint256 taskId) external view override returns (SlashingInfo memory) {
+    function getSlashingInfo(
+        uint256 taskId
+    ) external view override returns (SlashingInfo memory) {
         require(taskId <= latestTaskNum, "Invalid task ID");
         return taskSlashings[uint32(taskId)];
     }
 
     // Helper function to verify signatures
-    function isValidSignature(bytes32 messageHash, bytes memory signature, address signer)
-        internal
-        view
-        returns (bool)
-    {
+    function isValidSignature(
+        bytes32 messageHash,
+        bytes memory signature,
+        address signer
+    ) internal view returns (bool) {
         bytes32 ethSignedMessageHash = messageHash.toEthSignedMessageHash();
 
         // Try regular EOA signature verification
@@ -212,7 +242,9 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
         }
 
         // Try ERC1271 verification for smart contract wallets
-        try IERC1271Upgradeable(signer).isValidSignature(messageHash, signature) returns (bytes4 magicValue) {
+        try
+            IERC1271Upgradeable(signer).isValidSignature(messageHash, signature)
+        returns (bytes4 magicValue) {
             return magicValue == ERC1271_MAGIC_VALUE;
         } catch {
             return false;
@@ -225,15 +257,26 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
     }
 
     // These are just to comply with IServiceManager interface
-    function addPendingAdmin(address admin) external onlyOwner {}
+    function addPendingAdmin(address _admin) external onlyOwner {}
 
     function removePendingAdmin(address pendingAdmin) external onlyOwner {}
 
-    function removeAdmin(address admin) external onlyOwner {}
+    function removeAdmin(address _admin) external onlyOwner {}
 
-    function setAppointee(address appointee, address target, bytes4 selector) external override onlyOwner {}
+    function setAppointee(
+        address appointee,
+        address target,
+        bytes4 selector
+    ) external override onlyOwner {}
 
-    function removeAppointee(address appointee, address target, bytes4 selector) external onlyOwner {}
+    function removeAppointee(
+        address appointee,
+        address target,
+        bytes4 selector
+    ) external onlyOwner {}
 
-    function deregisterOperatorFromOperatorSets(address operator, uint32[] memory operatorSetIds) external override {}
+    function deregisterOperatorFromOperatorSets(
+        address operator,
+        uint32[] memory operatorSetIds
+    ) external override {}
 }
