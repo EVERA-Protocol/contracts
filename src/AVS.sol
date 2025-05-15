@@ -3,7 +3,6 @@ pragma solidity ^0.8.9;
 
 import {IAVS} from "./interfaces/IAVS.sol";
 import {ECDSAServiceManagerBase} from "@eigenlayer-middleware/src/unaudited/ECDSAServiceManagerBase.sol";
-import {ECDSAStakeRegistry} from "@eigenlayer-middleware/src/unaudited/ECDSAStakeRegistry.sol";
 import {IServiceManager} from "@eigenlayer-middleware/src/interfaces/IServiceManager.sol";
 import {ECDSAUpgradeable} from "@openzeppelin-upgrades/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 import {IERC1271Upgradeable} from "@openzeppelin-upgrades/contracts/interfaces/IERC1271Upgradeable.sol";
@@ -14,7 +13,6 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@eigenlayer/contracts/interfaces/IRewardsCoordinator.sol";
 import {IAllocationManagerTypes} from "@eigenlayer/contracts/interfaces/IAllocationManager.sol";
 import {IAllocationManager} from "@eigenlayer/contracts/interfaces/IAllocationManager.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract AVS is ECDSAServiceManagerBase, IAVS {
     using ECDSAUpgradeable for bytes32;
@@ -84,7 +82,7 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
         string calldata assetType
     ) external override {
         require(deadline > block.timestamp, "Deadline must be in future");
-        require(isOperator(assignee), "Assignee must be registered operator");
+        // require(isOperator(assignee), "Assignee must be registered operator");
 
         latestTaskNum++;
         uint32 taskId = latestTaskNum;
@@ -258,23 +256,18 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
 
     // These are just to comply with IServiceManager interface
     function addPendingAdmin(address _admin) external onlyOwner {}
-
     function removePendingAdmin(address pendingAdmin) external onlyOwner {}
-
     function removeAdmin(address _admin) external onlyOwner {}
-
     function setAppointee(
         address appointee,
         address target,
         bytes4 selector
     ) external override onlyOwner {}
-
     function removeAppointee(
         address appointee,
         address target,
         bytes4 selector
     ) external onlyOwner {}
-
     function deregisterOperatorFromOperatorSets(
         address operator,
         uint32[] memory operatorSetIds

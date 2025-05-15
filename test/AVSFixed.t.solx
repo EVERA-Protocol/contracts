@@ -27,14 +27,25 @@ contract MockAVS {
     mapping(uint32 => IAVS.SlashingInfo) private taskSlashings;
 
     // Events
-    event TaskCreated(uint256 indexed taskId, bytes32 indexed taskHash, address indexed operator, uint256 deadline);
+    event TaskCreated(
+        uint256 indexed taskId,
+        bytes32 indexed taskHash,
+        address indexed operator,
+        uint256 deadline
+    );
 
     event TaskCompleted(
-        uint256 indexed taskId, bytes32 indexed taskHash, address indexed operator, IAVS.VerificationStatus status
+        uint256 indexed taskId,
+        bytes32 indexed taskHash,
+        address indexed operator,
+        IAVS.VerificationStatus status
     );
 
     event SlashingRaised(
-        uint256 indexed taskId, address indexed reporter, address indexed operator, string reasonMetadata
+        uint256 indexed taskId,
+        address indexed reporter,
+        address indexed operator,
+        string reasonMetadata
     );
 
     // Modifiers
@@ -59,13 +70,23 @@ contract MockAVS {
         instantSlasher = newSlasher;
     }
 
-    function createTask(address assignee, uint256 deadline, address rwaToken, string calldata assetType) external {
+    function createTask(
+        address assignee,
+        uint256 deadline,
+        address rwaToken,
+        string calldata assetType
+    ) external {
         require(deadline > block.timestamp, "Deadline must be in future");
 
         latestTaskNum++;
         uint32 taskId = latestTaskNum;
 
-        bytes memory taskData = abi.encodePacked(assignee, deadline, rwaToken, assetType);
+        bytes memory taskData = abi.encodePacked(
+            assignee,
+            deadline,
+            rwaToken,
+            assetType
+        );
         bytes32 taskHash = keccak256(taskData);
 
         IAVS.Task memory newTask = IAVS.Task({
@@ -91,7 +112,10 @@ contract MockAVS {
         bytes calldata signature
     ) external {
         require(taskId <= latestTaskNum, "Invalid task ID");
-        require(allTaskHashes[uint32(taskId)] == taskHash, "Task hash mismatch");
+        require(
+            allTaskHashes[uint32(taskId)] == taskHash,
+            "Task hash mismatch"
+        );
 
         IAVS.Task storage task = tasks[uint32(taskId)];
         require(msg.sender == task.operator, "Not assigned operator");
@@ -114,12 +138,17 @@ contract MockAVS {
         return tasks[uint32(taskId)];
     }
 
-    function getTaskResponse(uint256 taskId) external view returns (IAVS.TaskResponse memory) {
+    function getTaskResponse(
+        uint256 taskId
+    ) external view returns (IAVS.TaskResponse memory) {
         require(taskId <= latestTaskNum, "Invalid task ID");
         return taskResponses[uint32(taskId)];
     }
 
-    function raiseSlashing(uint256 taskId, string calldata reasonMetadata) external onlyAdmin returns (bool) {
+    function raiseSlashing(
+        uint256 taskId,
+        string calldata reasonMetadata
+    ) external onlyAdmin returns (bool) {
         require(taskId <= latestTaskNum, "Invalid task ID");
         IAVS.Task storage task = tasks[uint32(taskId)];
 
@@ -127,7 +156,10 @@ contract MockAVS {
         require(task.operator != address(0), "Task does not exist");
 
         // Check if there's already a slashing for this task
-        require(!taskSlashings[uint32(taskId)].processed, "Slashing already processed");
+        require(
+            !taskSlashings[uint32(taskId)].processed,
+            "Slashing already processed"
+        );
 
         IAVS.SlashingInfo memory slashing = IAVS.SlashingInfo({
             reporter: msg.sender,
@@ -141,7 +173,12 @@ contract MockAVS {
 
         // Call the instant slasher if set
         if (instantSlasher != address(0)) {
-            try MockInstantSlasher(instantSlasher).fulfillSlashingRequest(task.operator, uint8(taskId), reasonMetadata)
+            try
+                MockInstantSlasher(instantSlasher).fulfillSlashingRequest(
+                    task.operator,
+                    uint8(taskId),
+                    reasonMetadata
+                )
             {
                 taskSlashings[uint32(taskId)].slashedAmount = 1; // Set actual amount if needed
             } catch {
@@ -155,7 +192,9 @@ contract MockAVS {
         return true;
     }
 
-    function getSlashingInfo(uint256 taskId) external view returns (IAVS.SlashingInfo memory) {
+    function getSlashingInfo(
+        uint256 taskId
+    ) external view returns (IAVS.SlashingInfo memory) {
         require(taskId <= latestTaskNum, "Invalid task ID");
         return taskSlashings[uint32(taskId)];
     }
@@ -168,10 +207,11 @@ contract MockInstantSlasher {
         shouldRevert = _shouldRevert;
     }
 
-    function fulfillSlashingRequest(address operator, uint8 taskId, string memory description)
-        external
-        returns (bool)
-    {
+    function fulfillSlashingRequest(
+        address operator,
+        uint8 taskId,
+        string memory description
+    ) external returns (bool) {
         if (shouldRevert) {
             revert("Slashing failed");
         }
@@ -202,7 +242,9 @@ contract AVSFixedTest is Test {
 
     function setUp() public {
         // Create a fork of Sepolia
-        sepoliaFork = vm.createFork("https://eth-sepolia.g.alchemy.com/v2/UCfPhTc7joIYqMspskE5rixdqPkrpC71");
+        sepoliaFork = vm.createFork(
+            "https://eth-sepolia.g.alchemy.com/v2/UCfPhTc7joIYqMspskE5rixdqPkrpC71"
+        );
         vm.selectFork(sepoliaFork);
         vm.rollFork(8330241); // Use the specific block
 
@@ -299,7 +341,13 @@ contract AVSFixedTest is Test {
 
         // Submit response
         vm.prank(operator);
-        avs.submitResponse(taskId, storedTaskHash, metadataURI, status, signature);
+        avs.submitResponse(
+            taskId,
+            storedTaskHash,
+            metadataURI,
+            status,
+            signature
+        );
 
         // Verify response was recorded
         IAVS.TaskResponse memory response = avs.getTaskResponse(taskId);
@@ -322,7 +370,13 @@ contract AVSFixedTest is Test {
         // Try to submit as non-operator
         vm.prank(user);
         vm.expectRevert("Not assigned operator");
-        avs.submitResponse(taskId, storedTaskHash, metadataURI, status, signature);
+        avs.submitResponse(
+            taskId,
+            storedTaskHash,
+            metadataURI,
+            status,
+            signature
+        );
     }
 
     function testSubmitResponse_TaskExpired() public {
@@ -344,7 +398,13 @@ contract AVSFixedTest is Test {
         // Try to submit after deadline
         vm.prank(operator);
         vm.expectRevert("Task deadline passed");
-        avs.submitResponse(taskId, storedTaskHash, metadataURI, status, signature);
+        avs.submitResponse(
+            taskId,
+            storedTaskHash,
+            metadataURI,
+            status,
+            signature
+        );
     }
 
     /**
