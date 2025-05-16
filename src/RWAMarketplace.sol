@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./LiquidityPool.sol";
 
 /**
  * @title RWAMarketplace
@@ -21,6 +22,13 @@ contract RWAMarketplace is Ownable, ReentrancyGuard {
     // Storage
     mapping(address => Pool) public pools;
     mapping(address => uint256) public pendingRevenue;
+    
+    // Liquidity pool address
+    LiquidityPool public liquidityPool;
+    
+    // Fee percentage (20% = 2000 basis points)
+    uint256 public constant LIQUIDITY_FEE_BASIS_POINTS = 2000;
+    uint256 public constant BASIS_POINTS_DENOMINATOR = 10000;
 
     // Events
     event TokensAddedToPool(address indexed tokenAddress, uint256 amount, uint256 pricePerToken);
@@ -28,8 +36,21 @@ contract RWAMarketplace is Ownable, ReentrancyGuard {
     event TokensPurchased(address indexed tokenAddress, address indexed buyer, uint256 amount, uint256 totalPrice);
     event RevenueClaimed(address indexed tokenCreator, uint256 amount);
     event PoolPriceUpdated(address indexed tokenAddress, uint256 newPricePerToken);
+    event LiquidityPoolUpdated(address indexed oldPool, address indexed newPool);
+    event FeeTransferred(address indexed recipient, uint256 amount);
 
     constructor() Ownable(msg.sender) {}
+    
+    /**
+     * @dev Set or update the Liquidity pool address - only owner can do this
+     * @param newLiquidityPool The address of the Liquidity pool
+     */
+    function setLiquidityPool(address newLiquidityPool) external onlyOwner {
+        require(newLiquidityPool != address(0), "Invalid pool address");
+        address oldPool = address(liquidityPool);
+        liquidityPool = LiquidityPool(newLiquidityPool);
+        emit LiquidityPoolUpdated(oldPool, newLiquidityPool);
+    }
 
     /**
      * @dev Add tokens to the pool - only token creator can do this
@@ -130,8 +151,22 @@ contract RWAMarketplace is Ownable, ReentrancyGuard {
         uint256 totalPrice = amount * pool.pricePerToken;
         require(msg.value == totalPrice, "Incorrect payment amount");
         
-        // Add revenue to token creator's pending amount
-        pendingRevenue[pool.tokenCreator] += totalPrice;
+        // Split revenue: 80% to token creator, 20% to Liquidity pool
+        uint256 liquidityFee = (totalPrice * LIQUIDITY_FEE_BASIS_POINTS) / BASIS_POINTS_DENOMINATOR;
+        uint256 creatorRevenue = totalPrice - liquidityFee;
+        
+        // Add 80% of revenue to token creator's pending amount
+        pendingRevenue[pool.tokenCreator] += creatorRevenue;
+        
+        // Transfer 20% to Liquidity pool if set
+        if (address(liquidityPool) != address(0)) {
+            (bool success, ) = payable(address(liquidityPool)).call{value: liquidityFee}("");
+            require(success, "Liquidity fee transfer failed");
+            emit FeeTransferred(address(liquidityPool), liquidityFee);
+        } else {
+            // If Liquidity pool not set, add to creator revenue
+            pendingRevenue[pool.tokenCreator] += liquidityFee;
+        }
         
         // Update pool
         pool.totalTokens -= amount;
