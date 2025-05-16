@@ -34,16 +34,8 @@ contract AVS is ECDSAServiceManagerBase, IAVS {
             _allocationManager
         )
     {
+        _transferOwnership(msg.sender);
         slasherHandler = new SlasherHandler(msg.sender, address(0));
-    }
-
-    function initialize(
-        address initialOwner,
-        address _rewardsInitiator,
-        address _slasher
-    ) external initializer {
-        __ServiceManagerBase_init(initialOwner, _rewardsInitiator);
-        slasherHandler.changeSlasher(_slasher);
     }
 
     function createTask(

@@ -37,7 +37,7 @@ contract AVSTest is Test {
             allocManager
         );
 
-        avs.initialize(msg.sender, msg.sender, msg.sender);
+        // avs.initialize(msg.sender, msg.sender, msg.sender);
 
         console.log(address(avs));
     }
